@@ -1,0 +1,111 @@
+import numpy as np
+import random
+
+# =========================
+# Warehouse Environment
+# =========================
+class WarehouseEnv:
+    def __init__(self):
+        self.grid_size = 5
+        self.shelf = (2, 2)
+        self.station = (4, 4)
+        self.reset()
+
+    def reset(self):
+        self.robot = [0, 0]
+        self.has_item = 0
+        return self.get_state()
+
+    def get_state(self):
+        return (self.robot[0], self.robot[1], self.has_item)
+
+    def step(self, action):
+        reward = -1
+
+        # Move
+        if action == 0:   # Up
+            self.robot[1] += 1
+        elif action == 1: # Down
+            self.robot[1] -= 1
+        elif action == 2: # Left
+            self.robot[0] -= 1
+        elif action == 3: # Right
+            self.robot[0] += 1
+
+        # Wall collision
+        if self.robot[0] < 0 or self.robot[0] >= self.grid_size or \
+           self.robot[1] < 0 or self.robot[1] >= self.grid_size:
+            reward -= 10
+            self.robot = [
+                min(max(self.robot[0], 0), self.grid_size - 1),
+                min(max(self.robot[1], 0), self.grid_size - 1)
+            ]
+
+        # Pick item
+        if tuple(self.robot) == self.shelf and self.has_item == 0:
+            reward += 50
+            self.has_item = 1
+
+        # Deliver item
+        done = False
+        if tuple(self.robot) == self.station and self.has_item == 1:
+            reward += 100
+            done = True
+
+        return self.get_state(), reward, done
+
+# =========================
+# Q-Learning Training
+# =========================
+env = WarehouseEnv()
+
+q_table = {}
+actions = [0, 1, 2, 3]
+
+alpha = 0.1      # Learning rate
+gamma = 0.9      # Discount factor
+epsilon = 1.0    # Exploration
+epsilon_decay = 0.995
+
+episodes = 2000
+
+for episode in range(episodes):
+    state = env.reset()
+    done = False
+
+    while not done:
+        if random.random() < epsilon:
+            action = random.choice(actions)
+        else:
+            action = np.argmax(q_table.get(state, [0, 0, 0, 0]))
+
+        next_state, reward, done = env.step(action)
+
+        q_table.setdefault(state, [0, 0, 0, 0])
+        q_table.setdefault(next_state, [0, 0, 0, 0])
+
+        q_table[state][action] += alpha * (
+            reward + gamma * max(q_table[next_state]) - q_table[state][action]
+        )
+
+        state = next_state
+
+    epsilon *= epsilon_decay
+
+print("Training completed!")
+
+# =========================
+# Testing the Robot
+# =========================
+state = env.reset()
+print("\nTesting trained robot:\n")
+
+for step in range(30):
+    action = np.argmax(q_table.get(state, [0, 0, 0, 0]))
+    state, reward, done = env.step(action)
+
+    print(f"Step {step+1} | Position: {env.robot} | Item: {env.has_item}")
+
+    if done:
+        print("\n✅ Item delivered successfully!")
+        break
