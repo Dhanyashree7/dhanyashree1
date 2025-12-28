@@ -1,0 +1,60 @@
+import numpy as np
+
+# Environment parameters
+MAX_INVENTORY = 100
+PRICE_PER_UNIT = 20
+HOLDING_COST = 2
+STOCKOUT_PENALTY = 10
+ORDER_COST = 5
+MEAN_DEMAND = 20
+DAYS = 30
+
+# Demand generation model
+def generate_demand():
+    return np.random.poisson(MEAN_DEMAND)
+
+# Inventory simulation
+def simulate_policy(policy_name):
+    inventory = 50
+    total_reward = 0
+    history = []
+
+    for day in range(DAYS):
+        demand = generate_demand()
+
+        # Policy decision
+        if policy_name == "no_reorder":
+            order = 0
+        elif policy_name == "threshold":
+            order = 40 if inventory < 30 else 0
+        elif policy_name == "aggressive":
+            order = 60 if inventory < 80 else 0
+
+        inventory += order
+
+        sales = min(inventory, demand)
+        inventory -= sales
+
+        reward = (
+            sales * PRICE_PER_UNIT
+            - inventory * HOLDING_COST
+            - max(0, demand - sales) * STOCKOUT_PENALTY
+            - order * ORDER_COST
+        )
+
+        total_reward += reward
+        history.append((day, demand, order, inventory, reward))
+
+    return total_reward, history
+
+# Run simulations
+policies = ["no_reorder", "threshold", "aggressive"]
+results = {}
+
+for p in policies:
+    reward, _ = simulate_policy(p)
+    results[p] = reward
+
+# Display results
+for policy, value in results.items():
+    print(f"{policy} policy total reward: {value}")
